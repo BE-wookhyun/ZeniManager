@@ -83,7 +83,7 @@ export default function AdminDashboard() {
   // 2. 필터링된 데이터 계산
   const filteredClients = useMemo(() => {
     return clients.filter(c => {
-      const counselor = counselors.find(con => con.user_id === c.counselor_id);
+      const counselor = counselors.find(con => con.counselor_id === c.counselor_id);
       const clientBranch = counselor?.department || c.branch || '미지정';
       const clientBusiness = String(c.business_type || '미지정');
       
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
       });
 
       filteredClients.forEach(c => {
-        const counselor = counselors.find(con => con.user_id === c.counselor_id);
+        const counselor = counselors.find(con => con.counselor_id === c.counselor_id);
         const b = counselor?.department || c.branch || '미지정';
         if (!map[b]) map[b] = { total: 0, done: 0, counselorCount: 0 };
         map[b].total++;
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
     } else {
       const branchCounselors = counselors.filter(c => c.department === selectedBranch);
       return branchCounselors.map(con => {
-        const conClients = filteredClients.filter(c => c.counselor_id === con.user_id);
+        const conClients = filteredClients.filter(c => c.counselor_id === con.counselor_id);
         const done = conClients.filter(c => !!c.employment_type || c.participation_stage === '취업완료').length;
         return {
           name: con.user_name, total: conClients.length, done: done,

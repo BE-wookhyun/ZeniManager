@@ -154,12 +154,23 @@ function assertDashboardSupabaseConfigured(scopeLabel: string): void {
   }
 }
 
-function assertDashboardRuntimeContract(scopeLabel: string, authUserId: string | null | undefined): string {
+function assertDashboardCounselorId(scopeLabel: string, counselorId: string | null | undefined): string {
+  assertDashboardSupabaseConfigured(scopeLabel);
+
+  const normalizedCounselorId = counselorId?.trim();
+  if (!normalizedCounselorId) {
+    throw new Error(`${scopeLabel} 기능을 호출하려면 public.counselors.id가 필요합니다.`);
+  }
+
+  return normalizedCounselorId;
+}
+
+function assertDashboardAuthUserId(scopeLabel: string, authUserId: string | null | undefined): string {
   assertDashboardSupabaseConfigured(scopeLabel);
 
   const normalizedAuthUserId = authUserId?.trim();
   if (!normalizedAuthUserId) {
-    throw new Error(`${scopeLabel} 기능을 호출하려면 로그인한 상담사 user_id가 필요합니다.`);
+    throw new Error(`${scopeLabel} 기능을 호출하려면 로그인한 사용자의 Auth UUID가 필요합니다.`);
   }
 
   return normalizedAuthUserId;
@@ -349,10 +360,10 @@ function createDashboardMonthlyBuckets(monthCount: number): DashboardMonthlyStat
 }
 
 export async function searchDashboardClients(
-  authUserId: string,
+  counselorId: string,
   rawQuery: string,
 ): Promise<ClientRow[]> {
-  const scopedAuthUserId = assertDashboardRuntimeContract('대시보드 검색', authUserId);
+  const scopedCounselorId = assertDashboardCounselorId('대시보드 검색', counselorId);
   const normalizedQuery = rawQuery.trim();
   if (!normalizedQuery) return [];
 
@@ -365,7 +376,7 @@ export async function searchDashboardClients(
     sb()
       .from('clients')
       .select(CLIENT_SELECT_FIELDS)
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .or(`name.ilike.${likeQuery},phone.ilike.${likeQuery},desired_job.ilike.${likeQuery}`)
       .order('updated_at', { ascending: false, nullsFirst: false })
       .limit(10),
@@ -375,23 +386,19 @@ export async function searchDashboardClients(
   return ((data ?? []) as LiveClientRecord[]).map(row => liveClientToRow(row));
 }
 
-export async function fetchDashboardStats(authUserId?: string): Promise<DashboardStats> {
-  assertDashboardSupabaseConfigured('대시보드 통계');
-  const scopedAuthUserId = authUserId?.trim() || null;
+export async function fetchDashboardStats(counselorId: string): Promise<DashboardStats> {
+  const scopedCounselorId = assertDashboardCounselorId('대시보드 통계', counselorId);
 
   const rows = await fetchAllPages<{
     participation_stage: string | null;
     score: number | null;
     retention_1m_yn: string | null;
   }>('대시보드 통계 조회', (from, to) => {
-    let query = sb()
+    const query = sb()
       .from('clients')
       .select('participation_stage, score, retention_1m_yn')
+      .eq('counselor_id', scopedCounselorId)
       .range(from, to);
-
-    if (scopedAuthUserId) {
-      query = query.eq('counselor_id', scopedAuthUserId);
-    }
 
     return query;
   });
@@ -429,10 +436,10 @@ export async function fetchDashboardStats(authUserId?: string): Promise<Dashboar
 }
 
 export async function fetchDashboardMonthlyStats(
-  authUserId: string,
+  counselorId: string,
   monthCount = 12,
 ): Promise<DashboardMonthlyStat[]> {
-  const scopedAuthUserId = assertDashboardRuntimeContract('대시보드 월간 통계', authUserId);
+  const scopedCounselorId = assertDashboardCounselorId('대시보드 월간 통계', counselorId);
   const monthKeys = buildRecentDashboardMonthKeys(monthCount);
   const [firstMonthKey, lastMonthKey] = [monthKeys[0], monthKeys[monthKeys.length - 1]];
   const rangeStart = `${firstMonthKey}-01`;
@@ -446,7 +453,7 @@ export async function fetchDashboardMonthlyStats(
     sb()
       .from('sessions')
       .select('client_id, date')
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .gte('date', rangeStart)
       .lte('date', rangeEnd)
       .range(from, to),
@@ -479,11 +486,11 @@ export async function fetchDashboardMonthlyStats(
 }
 
 export async function fetchDashboardCalendarMonthCounts(
-  authUserId: string,
+  counselorId: string,
   monthStart: string,
   monthEnd: string,
 ): Promise<Record<string, number>> {
-  const scopedAuthUserId = assertDashboardRuntimeContract('캘린더', authUserId);
+  const scopedCounselorId = assertDashboardCounselorId('캘린더', counselorId);
   assertDashboardDateRange('캘린더', monthStart, monthEnd);
 
   const histories = await fetchAllPages<{
@@ -493,7 +500,7 @@ export async function fetchDashboardCalendarMonthCounts(
     sb()
       .from('sessions')
       .select('client_id, date')
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .gte('date', monthStart)
       .lte('date', monthEnd)
       .range(from, to),
@@ -508,7 +515,7 @@ export async function fetchDashboardCalendarMonthCounts(
     sb()
       .from('clients')
       .select('id')
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .in('id', clientIds)
       .range(from, to),
   );
@@ -523,11 +530,11 @@ export async function fetchDashboardCalendarMonthCounts(
 }
 
 export async function fetchDashboardCalendarEntries(
-  authUserId: string,
+  counselorId: string,
   rangeStart: string,
   rangeEnd: string,
 ): Promise<DashboardCalendarEntry[]> {
-  const scopedAuthUserId = assertDashboardRuntimeContract('캘린더', authUserId);
+  const scopedCounselorId = assertDashboardCounselorId('캘린더', counselorId);
   assertDashboardDateRange('캘린더', rangeStart, rangeEnd);
 
   const histories = await fetchAllPages<{
@@ -539,7 +546,7 @@ export async function fetchDashboardCalendarEntries(
     sb()
       .from('sessions')
       .select('id, client_id, counselor_id, date')
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .gte('date', rangeStart)
       .lte('date', rangeEnd)
       .order('date', { ascending: false })
@@ -560,7 +567,7 @@ export async function fetchDashboardCalendarEntries(
     sb()
       .from('clients')
       .select('id, name, counselor_id, participation_stage')
-      .eq('counselor_id', scopedAuthUserId)
+      .eq('counselor_id', scopedCounselorId)
       .in('id', clientIds)
       .range(from, to),
   );
@@ -585,7 +592,7 @@ export async function fetchDashboardCalendarEntries(
 }
 
 export async function fetchMyMemo(authUserId: string): Promise<string | null> {
-  const scopedAuthUserId = assertDashboardRuntimeContract('개인 메모', authUserId);
+  const scopedAuthUserId = assertDashboardAuthUserId('개인 메모', authUserId);
 
   const { data, error } = await runQuery<LiveUserMemoRecord | null>(
     '개인 메모 조회',
@@ -608,7 +615,7 @@ export async function fetchMyMemo(authUserId: string): Promise<string | null> {
 
 export async function updateMyMemo(authUserId: string, memo: string | null): Promise<string | null> {
   const normalizedMemo = normalizeMemoValue(memo);
-  const scopedAuthUserId = assertDashboardRuntimeContract('개인 메모', authUserId);
+  const scopedAuthUserId = assertDashboardAuthUserId('개인 메모', authUserId);
 
   const { error, count } = await runQuery<null>(
     '개인 메모 저장',

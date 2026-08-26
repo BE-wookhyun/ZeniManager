@@ -202,6 +202,10 @@ export default function ClientRegister() {
     try {
       const createdClient = await createClient({
         name: form.name,
+        desired_job: [form.desired_job_1, form.desired_job_2, form.desired_job_3]
+          .map(value => value.trim())
+          .filter(Boolean)
+          .join(', ') || null,
         resident_id: encrypt(form.res_id_back), // 뒷자리 암호화 적용
         birth_date: form.birth_date || null,
         age: form.age ? parseInt(form.age, 10) : null,
@@ -524,15 +528,15 @@ export default function ClientRegister() {
           <div className="register_grid_3">
             <div className="register_field_group">
               <label className="register_sub_label">희망 직종 1</label>
-              <input type="text" value={form.desired_job_1} onChange={e => update('desired_job_1', e.target.value)} className="register_input sm_padding" />
+              <input type="text" maxLength={80} value={form.desired_job_1} onChange={e => update('desired_job_1', e.target.value)} className="register_input sm_padding" />
             </div>
             <div className="register_field_group">
               <label className="register_sub_label">희망 직종 2</label>
-              <input type="text" value={form.desired_job_2} onChange={e => update('desired_job_2', e.target.value)} className="register_input sm_padding" />
+              <input type="text" maxLength={80} value={form.desired_job_2} onChange={e => update('desired_job_2', e.target.value)} className="register_input sm_padding" />
             </div>
             <div className="register_field_group">
               <label className="register_sub_label">희망 직종 3</label>
-              <input type="text" value={form.desired_job_3} onChange={e => update('desired_job_3', e.target.value)} className="register_input sm_padding" />
+              <input type="text" maxLength={80} value={form.desired_job_3} onChange={e => update('desired_job_3', e.target.value)} className="register_input sm_padding" />
             </div>
 
             <div className="register_field_group">

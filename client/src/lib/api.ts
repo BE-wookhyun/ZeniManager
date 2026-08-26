@@ -532,7 +532,30 @@ export async function fetchCounselors(): Promise<CounselorRow[]> {
   );
 
   if (error) throw error;
-  return (data ?? []).map((row: any) => {
+  const userRows = data ?? [];
+  const authUserIds = userRows
+    .map((row: any) => row.user_id)
+    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+
+  const counselorIdByAuthUserId = new Map<string, string>();
+  if (authUserIds.length > 0) {
+    const { data: counselorRows, error: counselorError } = await runQuery<any[]>(
+      '상담사 내부 식별자 조회',
+      sb()
+        .from('counselors')
+        .select('id, auth_user_id')
+        .in('auth_user_id', authUserIds),
+    );
+
+    if (counselorError) throw counselorError;
+    (counselorRows ?? []).forEach((row: any) => {
+      if (typeof row.auth_user_id === 'string' && typeof row.id === 'string') {
+        counselorIdByAuthUserId.set(row.auth_user_id, row.id);
+      }
+    });
+  }
+
+  return userRows.map((row: any) => {
     // 1:1 관계라도 배열 혹은 객체로 올 수 있어 유연하게 처리
     let memoValue = null;
     const rawMemo = row.manager_memo;
@@ -546,6 +569,7 @@ export async function fetchCounselors(): Promise<CounselorRow[]> {
 
     return {
       user_id: row.user_id,
+      counselor_id: counselorIdByAuthUserId.get(row.user_id) ?? null,
       user_name: row.user_name ?? '이름 미상',
       department: row.department ?? '',
       memo: row.memo ?? null,
@@ -597,6 +621,7 @@ export async function createCounselor(input: CounselorInsert): Promise<Counselor
 
   return {
     user_id: newUserId,
+    counselor_id: null,
     user_name: (data as any).user_name ?? '이름 미상',
     department: (data as any).department ?? '',
     memo: (data as any).memo ?? null,
